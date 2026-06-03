@@ -31,4 +31,4 @@ Kerberoasting · DCSync · Golden Ticket · Pass-the-Hash · LSASS/SAM/NTDS dump
 - Any common PS attack patterns missing from the 4104 rules?
 - False positive suppressions you've needed beyond NT SERVICE / IIS AppPool / Azure AD Connect service accounts?
 - Do you see any rules that are overkill and could be handled by default rules without hassle of spanning to another custom child rule?
-- Ideas for dashboards anv visualisations in AD environment with Windows Servers (RDS, NPS, SQL, and other "Classic" services)
+- Ideas for dashboards and visualisations in AD environment with Windows Servers (RDS, NPS, SQL, and other "Classic" services)
