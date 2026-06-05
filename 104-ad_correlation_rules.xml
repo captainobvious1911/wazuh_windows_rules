@@ -214,9 +214,13 @@
        ============================================================ -->
 
   <!-- Special Privileges Assigned to New Logon -->
+  <!-- 4672 fires on every privileged/SYSTEM/service logon (very high volume), so
+       machine and well-known service principals are excluded — this now flags only
+       interactive privileged-USER logons. -->
   <rule id="100320" level="6">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4672$</field>
+    <field name="win.eventdata.subjectUserName" negate="yes" type="pcre2">\$$|(?i)^SYSTEM$|^LOCAL SERVICE$|^NETWORK SERVICE$</field>
     <options>no_full_log</options>
     <description>AD: Special privileges assigned to logon — $(win.eventdata.subjectUserName)</description>
     <mitre>
@@ -243,7 +247,7 @@
        ============================================================ -->
 
   <!-- Explicit Credential Logon (RunAs / credential harvesting indicator) -->
-  <rule id="100322" level="8">
+  <rule id="100322" level="6">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4648$</field>
     <field name="win.eventdata.subjectDomainName" negate="yes" type="pcre2">(?i)^NT SERVICE$|^NT AUTHORITY$|^Window Manager$|^Font Driver Host$</field>
@@ -332,14 +336,16 @@
   </rule>
 
   <!-- net.exe / net1.exe Execution -->
-  <rule id="100341" level="10">
+  <!-- net.exe is ubiquitous (net use / net time in logon scripts), so the single
+       execution is low-signal (L4); the real detection is the burst rule 100342. -->
+  <rule id="100341" level="4">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>
     <field name="win.eventdata.newProcessName">\\net\.exe$|\\net1\.exe$</field>
     <options>no_full_log</options>
     <description>AD: net.exe execution detected on $(win.system.computer) by $(win.eventdata.subjectUserName)</description>
     <mitre>
-      <id>T1136.001</id>
+      <id>T1087.002</id>
     </mitre>
     <group>attack,reconnaissance,process_creation,</group>
   </rule>
@@ -471,7 +477,9 @@
 
   <!-- 4776 — NTLM credential validation on DC. No default Wazuh rule covers this EID.
        A burst of 4776 events from same workstation across different users = NTLM spray / PtH indicator. -->
-  <rule id="100356" level="6">
+  <!-- 4776 fires on every NTLM validation on the DC (high volume) — kept as a L3
+       feeder for the spray correlation 100364 below, not an alert on its own. -->
+  <rule id="100356" level="3">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4776$</field>
     <field name="win.eventdata.targetUserName" negate="yes" type="pcre2">\$$</field>
@@ -481,6 +489,21 @@
       <id>T1550.002</id>
     </mitre>
     <group>authentication,ntlm,</group>
+  </rule>
+
+  <!-- 4776 burst from the same workstation = NTLM password spray / brute force
+       (the correlation the 100356 comment promised). Many NTLM validations from
+       one source host in a short window is the spray indicator. -->
+  <rule id="100364" level="12" frequency="10" timeframe="120">
+    <if_matched_sid>100356</if_matched_sid>
+    <same_field>win.eventdata.workstationName</same_field>
+    <options>no_full_log</options>
+    <description>AD: Possible NTLM password spray — 10+ NTLM validations from $(win.eventdata.workstationName)</description>
+    <mitre>
+      <id>T1110.003</id>
+      <id>T1550.002</id>
+    </mitre>
+    <group>attack,authentication,ntlm,brute_force,password_spray,</group>
   </rule>
 
   <!-- 4698 — scheduled task created by non-system account.
