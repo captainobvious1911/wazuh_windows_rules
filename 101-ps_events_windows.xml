@@ -6,7 +6,7 @@
        ============================================================ -->
 
   <!-- whoami variants - identity discovery -->
-  <rule id="100400" level="8">
+  <rule id="100400" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)whoami</field>
@@ -19,10 +19,10 @@
   </rule>
 
   <!-- System info gathering -->
-  <rule id="100401" level="8">
+  <rule id="100401" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
-    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)systeminfo|Get-ComputerInfo|Get-WmiObject Win32_ComputerSystem|Get-CimInstance Win32_ComputerSystem</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)systeminfo|Get-ComputerInfo|Get-WmiObject\s+Win32_ComputerSystem|Get-CimInstance\s+Win32_ComputerSystem</field>
     <options>no_full_log</options>
     <description>PS Recon: System information gathering on $(win.system.computer)</description>
     <mitre>
@@ -32,7 +32,7 @@
   </rule>
 
   <!-- Network configuration discovery -->
-  <rule id="100402" level="8">
+  <rule id="100402" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)ipconfig|Get-NetIPAddress|Get-NetIPConfiguration|Get-NetAdapter</field>
@@ -45,10 +45,10 @@
   </rule>
 
   <!-- Running process enumeration -->
-  <rule id="100403" level="8">
+  <rule id="100403" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
-    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-Process|tasklist|Get-WmiObject Win32_Process|Get-CimInstance Win32_Process</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-Process|tasklist|Get-WmiObject\s+Win32_Process|Get-CimInstance\s+Win32_Process</field>
     <options>no_full_log</options>
     <description>PS Recon: Running process enumeration on $(win.system.computer)</description>
     <mitre>
@@ -58,10 +58,10 @@
   </rule>
 
   <!-- Installed software enumeration -->
-  <rule id="100404" level="8">
+  <rule id="100404" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
-    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-WmiObject Win32_Product|Get-ItemProperty HKLM.*Uninstall|winrm enumerate</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-WmiObject\s+Win32_Product|Get-ItemProperty\s+HKLM.*Uninstall|winrm enumerate</field>
     <options>no_full_log</options>
     <description>PS Recon: Installed software enumeration on $(win.system.computer)</description>
     <mitre>
@@ -71,7 +71,7 @@
   </rule>
 
   <!-- Local user and group enumeration -->
-  <rule id="100405" level="8">
+  <rule id="100405" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-LocalUser|Get-LocalGroup|Get-LocalGroupMember|net localgroup|net user</field>
@@ -84,7 +84,7 @@
   </rule>
 
   <!-- Open ports and network connections -->
-  <rule id="100406" level="8">
+  <rule id="100406" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-NetTCPConnection|Get-NetUDPEndpoint|netstat</field>
@@ -97,7 +97,7 @@
   </rule>
 
   <!-- Scheduled tasks enumeration -->
-  <rule id="100407" level="8">
+  <rule id="100407" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-ScheduledTask|schtasks</field>
@@ -110,16 +110,31 @@
   </rule>
 
   <!-- Services enumeration -->
-  <rule id="100408" level="8">
+  <rule id="100408" level="4">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
-    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-Service|sc query|Get-WmiObject Win32_Service|Get-CimInstance Win32_Service</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-Service|sc query|Get-WmiObject\s+Win32_Service|Get-CimInstance\s+Win32_Service</field>
     <options>no_full_log</options>
     <description>PS Recon: Windows service enumeration on $(win.system.computer)</description>
     <mitre>
       <id>T1007</id>
     </mitre>
     <group>recon,discovery,</group>
+  </rule>
+
+  <!-- Active host reconnaissance: a burst of distinct discovery commands from one
+       host in a short window. Compensates for 100400-100408 being lowered to L4 —
+       a single discovery command is low-signal, but many in 2 minutes is not.
+       Composite (if_matched_group), so the L4 base levels still feed it. -->
+  <rule id="100409" level="10" frequency="6" timeframe="120">
+    <if_matched_group>discovery</if_matched_group>
+    <same_field>win.system.computer</same_field>
+    <options>no_full_log</options>
+    <description>PS Recon: Active host reconnaissance — multiple discovery commands on $(win.system.computer)</description>
+    <mitre>
+      <id>T1082</id>
+    </mitre>
+    <group>recon,reconnaissance_burst,</group>
   </rule>
 
   <!-- ============================================================
@@ -131,7 +146,7 @@
   <rule id="100410" level="10">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
-    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-ADUser|Get-ADObject|([adsisearcher])</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-ADUser|Get-ADObject|\[adsisearcher\]</field>
     <options>no_full_log</options>
     <description>PS Recon: Active Directory user enumeration on $(win.system.computer)</description>
     <mitre>
@@ -213,7 +228,7 @@
   <rule id="100420" level="10">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
-    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-SmbShare|Get-WmiObject Win32_Share|net share|net view</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-SmbShare|Get-WmiObject\s+Win32_Share|net share|net view</field>
     <options>no_full_log</options>
     <description>PS Recon: Network share enumeration on $(win.system.computer)</description>
     <mitre>
@@ -226,7 +241,7 @@
   <rule id="100421" level="12">
     <if_sid>91802</if_sid>
     <field name="win.system.eventID">^4104$</field>
-    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Test-NetConnection|Invoke-Portscan|1..1024|foreach.*TcpClient</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Invoke-Portscan|1\.\.1024|foreach.*TcpClient</field>
     <options>no_full_log</options>
     <description>PS Recon: Port scanning activity detected on $(win.system.computer)</description>
     <mitre>
