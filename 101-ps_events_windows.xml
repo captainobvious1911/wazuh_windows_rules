@@ -1,302 +1,229 @@
-<group name="windows,registry_integrity,syscheck,">
+<!-- ============================================================
+     SECTION 1 - Silence default leaves replaced by custom rules
+     overwrite="yes" REPLACES the default rule wholesale, so each block
+     below restates the original's parent + eventID match and just sets
+     level 0. (The match does NOT have to be byte-identical to the
+     original — see 60112, which intentionally also adds 4715 — but
+     keeping it aligned avoids silently changing what the gate matches.)
+     Children (your 1003xx rules) keep firing because the level-0 parent
+     still routes events to them.
+     ============================================================ -->
+<group name="windows,">
 
-  <!-- ============================================================
-       SECTION 1 — Persistence (Run Keys)
-  ============================================================ -->
-
-  <!-- Run / RunOnce key modified — classic persistence -->
-  <rule id="100500" level="12">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">CurrentVersion\\Run</field>
-    <description>Registry: Run/RunOnce key changed — possible persistence on $(agent.name)</description>
-    <mitre>
-      <id>T1547.001</id>
-    </mitre>
-    <group>registry,persistence,</group>
-  </rule>
-
-
-  <!-- ============================================================
-       SECTION 2 — Credential Protection (LSA / WDigest)
-  ============================================================ -->
-
-  <!-- LSA registry key modified — RunAsPPL, auth packages, notification DLLs -->
-  <rule id="100501" level="13">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path" type="pcre2">Control\\Lsa($|\\)</field>
-    <description>Registry: LSA key modified — credential protection settings changed on $(agent.name)</description>
-    <mitre>
-      <id>T1556.002</id>
-    </mitre>
-    <group>registry,credential_access,defense_evasion,</group>
-  </rule>
-
-  <!-- WDigest modified — plaintext credential caching may be re-enabled -->
-  <rule id="100502" level="14">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">SecurityProviders\\WDigest</field>
-    <description>Registry: WDigest key modified — plaintext credential caching may be enabled on $(agent.name)</description>
-    <mitre>
-      <id>T1556.002</id>
-    </mitre>
-    <group>registry,credential_access,</group>
-  </rule>
-
-  <!-- SSP/Security Provider list — injected DLLs load into LSASS -->
-  <rule id="100503" level="14">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Control\\Lsa\\OSConfig</field>
-    <description>Registry: LSA OSConfig modified — Security Support Provider list may have changed on $(agent.name)</description>
-    <mitre>
-      <id>T1547.005</id>
-    </mitre>
-    <group>registry,persistence,credential_access,</group>
-  </rule>
-
-
-  <!-- ============================================================
-       SECTION 3 — Defense Evasion
-  ============================================================ -->
-
-  <!-- Windows Defender policy key modified -->
-  <rule id="100510" level="14">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Policies\\Microsoft\\Windows Defender</field>
-    <description>Registry: Windows Defender policy key modified on $(agent.name) — protection may be disabled</description>
-    <mitre>
-      <id>T1562.001</id>
-    </mitre>
-    <group>registry,defense_evasion,</group>
-  </rule>
-
-  <!-- Windows Defender real-time settings modified.
-       Excludes the Policies subtree so this does not double-alert with 100510
-       (which owns Policies\Microsoft\Windows Defender). -->
-  <rule id="100511" level="14">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Microsoft\\Windows Defender</field>
-    <field name="syscheck.path" negate="yes" type="pcre2">Policies\\Microsoft\\Windows Defender</field>
-    <description>Registry: Windows Defender settings modified on $(agent.name)</description>
-    <mitre>
-      <id>T1562.001</id>
-    </mitre>
-    <group>registry,defense_evasion,</group>
-  </rule>
-
-  <!-- UAC policy modified — disabling prompts is a common escalation step -->
-  <rule id="100512" level="13">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Policies\\System</field>
-    <description>Registry: UAC/system policy key modified on $(agent.name)</description>
-    <mitre>
-      <id>T1548.002</id>
-    </mitre>
-    <group>registry,defense_evasion,privilege_escalation,</group>
-  </rule>
-
-  <!-- Audit policy registry key modified — possible attempt to blind logging -->
-  <rule id="100513" level="14">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">SECURITY\\Policy\\PolAdtEv</field>
-    <description>Registry: Audit policy registry key modified on $(agent.name) — logging may be reduced</description>
-    <mitre>
-      <id>T1562.002</id>
-    </mitre>
-    <group>registry,defense_evasion,</group>
-  </rule>
-
-
-  <!-- ============================================================
-       SECTION 4 — Backdoors / Code Injection
-  ============================================================ -->
-
-  <!-- Image File Execution Options — debugger hijacking (accessibility backdoor) -->
-  <rule id="100520" level="15">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Image File Execution Options</field>
-    <description>Registry: IFEO key modified on $(agent.name) — possible debugger hijacking or accessibility backdoor</description>
-    <mitre>
-      <id>T1546.012</id>
-    </mitre>
-    <group>registry,persistence,privilege_escalation,</group>
-  </rule>
-
-  <!-- Winlogon modified — shell or credential provider replacement -->
-  <rule id="100521" level="14">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">CurrentVersion\\Winlogon</field>
-    <description>Registry: Winlogon key modified on $(agent.name) — shell or credential provider may have changed</description>
-    <mitre>
-      <id>T1547.004</id>
-    </mitre>
-    <group>registry,persistence,</group>
-  </rule>
-
-  <!-- AppInit_DLLs — DLL injected into every user-mode process -->
-  <rule id="100522" level="15">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Windows NT\\CurrentVersion\\Windows</field>
-    <description>Registry: AppInit_DLLs key modified on $(agent.name) — DLL injection into user-mode processes possible</description>
-    <mitre>
-      <id>T1546.010</id>
-    </mitre>
-    <group>registry,persistence,</group>
-  </rule>
-
-
-  <!-- ============================================================
-       SECTION 5 — Services
-  ============================================================ -->
-
-  <!-- New service created or existing service modified -->
-  <rule id="100530" level="11">
-    <if_sid>550,553</if_sid>
-    <field name="syscheck.path">CurrentControlSet\\Services</field>
-    <description>Registry: Services key modified on $(agent.name) — service created or changed</description>
-    <mitre>
-      <id>T1543.003</id>
-    </mitre>
-    <group>registry,persistence,</group>
-  </rule>
-
-  <!-- Service deleted -->
-  <rule id="100531" level="10">
-    <if_sid>554</if_sid>
-    <field name="syscheck.path">CurrentControlSet\\Services</field>
-    <description>Registry: Services key deleted on $(agent.name) — service removed</description>
-    <mitre>
-      <id>T1543.003</id>
-    </mitre>
-    <group>registry,</group>
-  </rule>
-
-
-  <!-- ============================================================
-       SECTION 6 — Remote Access / RDP
-  ============================================================ -->
-
-  <!-- RDP enable/disable or port change -->
-  <rule id="100535" level="12">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Control\\Terminal Server</field>
-    <description>Registry: Terminal Server/RDP key modified on $(agent.name) — RDP may have been enabled or reconfigured</description>
-    <mitre>
-      <id>T1021.001</id>
-    </mitre>
-    <group>registry,lateral_movement,</group>
-  </rule>
-
-
-  <!-- ============================================================
-       SECTION 7 — PowerShell Execution Policy
-  ============================================================ -->
-
-  <!-- PowerShell execution policy lowered via registry -->
-  <rule id="100540" level="12">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Microsoft\\PowerShell</field>
-    <description>Registry: PowerShell execution policy key modified on $(agent.name)</description>
-    <mitre>
-      <id>T1059.001</id>
-    </mitre>
-    <group>registry,defense_evasion,</group>
-  </rule>
-
-
-  <!-- ============================================================
-       SECTION 8 — DOMAIN CONTROLLER SPECIFIC
-       Apply only when agent is in windows-dc group
-  ============================================================ -->
-
-  <!-- Print Spooler re-enabled on DC (should be disabled post-PrintNightmare) -->
-  <rule id="100550" level="14">
-    <if_sid>550,553</if_sid>
-    <field name="syscheck.path">CurrentControlSet\\Services\\Spooler</field>
-    <description>Registry: Print Spooler service key modified on DC $(agent.name) — verify spooler is not being re-enabled</description>
-    <mitre>
-      <id>T1574</id>
-    </mitre>
-    <group>registry,dc,defense_evasion,</group>
-  </rule>
-
-  <!-- Netlogon parameters changed — secure channel, DC locator behaviour -->
-  <rule id="100551" level="12">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Services\\Netlogon\\Parameters</field>
-    <description>Registry: Netlogon parameters modified on DC $(agent.name)</description>
-    <mitre>
-      <id>T1562</id>
-    </mitre>
-    <group>registry,dc,</group>
-  </rule>
-
-  <!-- NTDS parameters changed — AD database path or replication config -->
-  <rule id="100552" level="13">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Services\\NTDS\\Parameters</field>
-    <description>Registry: NTDS parameters modified on DC $(agent.name) — AD database config may have changed</description>
-    <mitre>
-      <id>T1562</id>
-    </mitre>
-    <group>registry,dc,</group>
-  </rule>
-
-  <!-- KDC / Kerberos settings changed — encryption types, ticket lifetime -->
-  <rule id="100553" level="13">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Services\\Kdc</field>
-    <description>Registry: KDC/Kerberos settings modified on DC $(agent.name) — ticket policy or encryption types may have changed</description>
-    <mitre>
-      <id>T1558</id>
-    </mitre>
-    <group>registry,dc,</group>
-  </rule>
-
-  <!-- W32Time config changed — Kerberos is time-sensitive, time skew = auth failure -->
-  <rule id="100554" level="11">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Services\\W32Time</field>
+  <!-- 4624 success "Windows Logon Success": replaced by 100200-100208
+       (per-logon-type). Silenced to L0 - it still ROUTES to both your
+       100200-series AND the 0840 RDP chain (92651->92653/92657), which
+       both chain from 60106. So RDP detection via 0840 keeps working. -->
+  <rule id="60106" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^528$|^540$|^673$|^4624$|^4769$</field>
+    <description>Windows Logon Success (silenced - see 100200-100208 / 0840 RDP)</description>
     <options>no_full_log</options>
-    <description>Registry: Windows Time service config modified on DC $(agent.name)</description>
-    <mitre>
-      <id>T1562.001</id>
-    </mitre>
-    <group>registry,dc,</group>
+    <group>authentication_success,</group>
   </rule>
 
-  <!-- DNS Server parameters changed -->
-  <rule id="100555" level="11">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Services\\DNS\\Parameters</field>
+  <!-- 4625 failure: replaced by 100210-100214. Silenced to L0,
+       still routes to those children. -->
+  <rule id="60122" level="0" overwrite="yes">
+    <if_sid>60105</if_sid>
+    <field name="win.system.eventID">^529$|^4625$</field>
+    <description>Logon Failure (silenced - see 100210-100214)</description>
     <options>no_full_log</options>
-    <description>Registry: DNS Server parameters modified on DC $(agent.name)</description>
-    <mitre>
-      <id>T1584.002</id>
-    </mitre>
-    <group>registry,dc,</group>
+    <group>authentication_failed,</group>
   </rule>
 
-  <!-- DFSR parameters changed — SYSVOL replication health -->
-  <rule id="100556" level="11">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Services\\DFSR\\Parameters</field>
+  <!-- 4740 lockout: replaced by 100300 (+correlation 100301) -->
+  <rule id="60115" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^644$|^4740$</field>
+    <description>Account locked out (silenced - see 100300)</description>
     <options>no_full_log</options>
-    <description>Registry: DFSR parameters modified on DC $(agent.name) — SYSVOL replication config may have changed</description>
-    <mitre>
-      <id>T1490</id>
-    </mitre>
-    <group>registry,dc,</group>
+    <group>account_changed,</group>
   </rule>
 
-  <!-- SMB server parameters — EternalBlue / PrintNightmare mitigations -->
-  <rule id="100557" level="12">
-    <if_sid>550,553,554</if_sid>
-    <field name="syscheck.path">Services\\LanmanServer\\Parameters</field>
-    <description>Registry: SMB server parameters modified on DC $(agent.name) — verify SMB hardening settings are intact</description>
+  <!-- 4720/4722 created/enabled: replaced by 100304/100306 -->
+  <rule id="60109" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^624$|^626$|^4720$|^4722$</field>
+    <description>Account created/enabled (silenced - see 100304/100306)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <!-- 4725/4726 disabled/deleted: replaced by 100307/100305 -->
+  <rule id="60111" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^630$|^629$|^4725$|^4726$</field>
+    <description>Account disabled/deleted (silenced - see 100305/100307)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <!-- Group membership parent 60113: children 60141/42/44/45/51/52
+       are what actually fire. We silence those leaves below, but
+       60113 itself must stay intact (it's the parent your rules and
+       the leaves both chain from). Leave 60113 alone. -->
+
+  <rule id="60141" level="0" overwrite="yes">
+    <if_sid>60113</if_sid>
+    <field name="win.system.eventID">^632$|^4728$</field>
+    <description>Global group member added (silenced - see 100310)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <rule id="60142" level="0" overwrite="yes">
+    <if_sid>60113</if_sid>
+    <field name="win.system.eventID">^633$|^4729$</field>
+    <description>Global group member removed (silenced - see 100313)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <rule id="60144" level="0" overwrite="yes">
+    <if_sid>60113</if_sid>
+    <field name="win.system.eventID">^636$|^4732$</field>
+    <description>Local group member added (silenced - see 100311)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <rule id="60145" level="0" overwrite="yes">
+    <if_sid>60113</if_sid>
+    <field name="win.system.eventID">^637$|^4733$</field>
+    <description>Local group member removed (silenced - see 100314)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <rule id="60151" level="0" overwrite="yes">
+    <if_sid>60113</if_sid>
+    <field name="win.system.eventID">^660$|^4756$</field>
+    <description>Universal group member added (silenced - see 100312)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <rule id="60152" level="0" overwrite="yes">
+    <if_sid>60113</if_sid>
+    <field name="win.system.eventID">^661$|^4757$</field>
+    <description>Universal group member removed (silenced - see 100315)</description>
+    <options>no_full_log</options>
+    <group>account_changed,</group>
+  </rule>
+
+  <!-- 1102 log cleared: replaced by 100352 (parent is 60100) -->
+  <rule id="60117" level="0" overwrite="yes">
+    <if_sid>60100</if_sid>
+    <field name="win.system.eventID">^517$|^1102$</field>
+    <description>Audit log cleared (silenced - see 100352)</description>
+    <options>no_full_log</options>
+    <group>logs_cleared,</group>
+  </rule>
+
+  <!-- 4719/4907/4912 audit policy events: all three are now covered by
+       custom rules 100351/100362/100363 in 104-ad_correlation_rules.xml.
+       60112 is silenced here so only the specific custom rules alert.
+       NOTE: this overwrite also adds 4715 (the original default match had
+       a duplicated 4719 and no 4715) — intentional and harmless. -->
+  <rule id="60112" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^612$|^643$|^4719$|^4907$|^4912$|^4715$</field>
+    <description>Audit policy changed (silenced - see 100351/100362/100363)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- 5136 DS object modified: replaced by 100350 -->
+  <rule id="60229" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^5136$</field>
+    <description>DS object modified (silenced - see 100350)</description>
+    <options>no_full_log</options>
+    <group>policy_changed,</group>
+  </rule>
+
+  <!-- 4634/4647 logoff: replaced by 100220/100221 (both level 2,
+       low value - if you'd rather just keep the default 60137 logoff
+       rule and drop your 100220/221, that's fine too. We silence
+       60137 here since your rules split system vs user logoff.) -->
+  <rule id="60137" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^538$|^551$|^4634$|^4647$</field>
+    <description>User logoff (silenced - see 100220/100221)</description>
+    <options>no_full_log</options>
+    <group>logoff,</group>
+  </rule>
+
+</group>
+
+
+<!-- ============================================================
+     SECTION 2 - Custom DC detections (no default equivalent)
+     ============================================================ -->
+<group name="security_event,windows,">
+
+  <!-- DCSync: ignore replication from machine accounts (normal).
+       No default matches 4662, so this is a clean child of 60103.
+       Pairs with 100332 (which excludes machine accounts). -->
+  <rule id="110009" level="0">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4662$</field>
+    <field name="win.eventdata.properties" type="pcre2">{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}|{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}|{19195a5b-6da0-11d0-afd3-00c04fd930c9}</field>
+    <field name="win.eventdata.subjectUserName" type="pcre2">\$$</field>
+    <options>no_full_log</options>
+    <description>Ignore Directory Service Access from machine account (normal DC replication)</description>
+  </rule>
+
+  <!-- Kerberoasting: 4769 RC4 + forwardable/renewable/canonicalize,
+       excluding machine accounts and krbtgt. Chains from default
+       60106 (which matches 4769 success). Feeds correlation 100331. -->
+  <rule id="110002" level="10">
+    <if_sid>60106</if_sid>
+    <field name="win.system.eventID">^4769$</field>
+    <field name="win.eventdata.ticketOptions" type="pcre2">0x40810000</field>
+    <field name="win.eventdata.ticketEncryptionType" type="pcre2">0x17</field>
+    <field name="win.eventdata.serviceName" negate="yes" type="pcre2">\$$|^krbtgt$</field>
+    <options>no_full_log</options>
+    <description>Possible Kerberoasting - RC4 TGS request for $(win.eventdata.serviceName) by $(win.eventdata.targetUserName)</description>
     <mitre>
-      <id>T1562</id>
+      <id>T1558.003</id>
     </mitre>
-    <group>registry,dc,defense_evasion,</group>
+    <group>attack,credential_theft,kerberoasting,</group>
+  </rule>
+
+  <!-- Golden Ticket: 4624 logonType 3, Kerberos + null GUID.
+       Chains from your 100202 (network logon). The Kerberos filter
+       removes the NTLM false positives that plagued the old version. -->
+  <rule id="110003" level="12">
+    <if_sid>100202</if_sid>
+    <field name="win.eventdata.authenticationPackageName" type="pcre2">(?i)^Kerberos$</field>
+    <field name="win.eventdata.logonGuid" type="pcre2">^\{0+\-0+\-0+\-0+\-0+\}$</field>
+    <options>no_full_log</options>
+    <description>Possible Golden Ticket - Kerberos network logon with null GUID on $(win.system.computer) by $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1558.001</id>
+    </mitre>
+    <group>attack,credential_theft,golden_ticket,</group>
+  </rule>
+
+  <!-- Silver Ticket — forged service ticket (4769 success).
+       Indicators: RC4 (0x17) or RC4-HMAC-EXP (0x23) encryption on a TGS for a
+       non-machine, non-krbtgt SPN, without the Kerberoasting ticket options flag.
+       Parent if_sid 60106 covers 4769 (confirmed in 0580:line 78).
+       Kerberoasting ticketOptions 0x40810000 is excluded so this does not overlap
+       with rule 110002 (Kerberoasting single) or 100331 (Kerberoasting burst). -->
+  <rule id="100360" level="13">
+    <if_sid>60106</if_sid>
+    <field name="win.system.eventID">^4769$</field>
+    <field name="win.eventdata.ticketEncryptionType" type="pcre2">0x17|0x23</field>
+    <field name="win.eventdata.serviceName" negate="yes" type="pcre2">\$$|^krbtgt$</field>
+    <field name="win.eventdata.ticketOptions" negate="yes" type="pcre2">0x40810000</field>
+    <options>no_full_log</options>
+    <description>AD: Possible Silver Ticket — RC4 service ticket for $(win.eventdata.serviceName) by $(win.eventdata.subjectUserName) on $(win.system.computer)</description>
+    <mitre>
+      <id>T1558.002</id>
+    </mitre>
+    <group>attack,credential_theft,silver_ticket,</group>
   </rule>
 
 </group>
