@@ -69,10 +69,13 @@
     <group>registry,defense_evasion,</group>
   </rule>
 
-  <!-- Windows Defender real-time settings modified -->
+  <!-- Windows Defender real-time settings modified.
+       Excludes the Policies subtree so this does not double-alert with 100510
+       (which owns Policies\Microsoft\Windows Defender). -->
   <rule id="100511" level="14">
     <if_sid>550,553,554</if_sid>
     <field name="syscheck.path">Microsoft\\Windows Defender</field>
+    <field name="syscheck.path" negate="yes" type="pcre2">Policies\\Microsoft\\Windows Defender</field>
     <description>Registry: Windows Defender settings modified on $(agent.name)</description>
     <mitre>
       <id>T1562.001</id>
