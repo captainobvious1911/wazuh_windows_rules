@@ -24,6 +24,9 @@
     <field name="win.eventdata.logonType">^10$</field>
     <options>no_full_log</options>
     <description>AD: RDP logon - $(win.eventdata.targetUserName) from $(win.eventdata.ipAddress)</description>
+    <mitre>
+      <id>T1021.001</id>
+    </mitre>
     <group>authentication_success,remote_logon,</group>
   </rule>
 
@@ -69,6 +72,9 @@
     <field name="win.eventdata.logonType">^9$</field>
     <options>no_full_log</options>
     <description>AD: NewCredentials logon (runas /netonly) - $(win.eventdata.targetUserName) on $(win.system.computer)</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
     <group>authentication_success,suspicious_logon,</group>
   </rule>
 
@@ -165,7 +171,7 @@
   <!-- Multiple RDP failures for the same user within 5 minutes = possible
        brute-force in progress. Fires on the 2nd RDP failure (100211) for
        the same targetUserName — NOT a success-after-failure rule. -->
-  <rule id="100222" level="10" frequency="2" timeframe="300">
+  <rule id="100222" level="7" frequency="3" timeframe="300">
     <if_matched_sid>100211</if_matched_sid>
     <same_field>win.eventdata.targetUserName</same_field>
     <options>no_full_log</options>
