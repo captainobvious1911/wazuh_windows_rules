@@ -1,8 +1,12 @@
 <!-- ============================================================
      SECTION 1 - Silence default leaves replaced by custom rules
-     Each overwrite mirrors the original default's parent + eventID
-     match EXACTLY (required for overwrite to be accepted), then
-     sets level 0. Children (your 1003xx rules) keep firing.
+     overwrite="yes" REPLACES the default rule wholesale, so each block
+     below restates the original's parent + eventID match and just sets
+     level 0. (The match does NOT have to be byte-identical to the
+     original — see 60112, which intentionally also adds 4715 — but
+     keeping it aligned avoids silently changing what the gate matches.)
+     Children (your 1003xx rules) keep firing because the level-0 parent
+     still routes events to them.
      ============================================================ -->
 <group name="windows,">
 
@@ -119,7 +123,9 @@
 
   <!-- 4719/4907/4912 audit policy events: all three are now covered by
        custom rules 100351/100362/100363 in 104-ad_correlation_rules.xml.
-       60112 is silenced here so only the specific custom rules alert. -->
+       60112 is silenced here so only the specific custom rules alert.
+       NOTE: this overwrite also adds 4715 (the original default match had
+       a duplicated 4719 and no 4715) — intentional and harmless. -->
   <rule id="60112" level="0" overwrite="yes">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^612$|^643$|^4719$|^4907$|^4912$|^4715$</field>
